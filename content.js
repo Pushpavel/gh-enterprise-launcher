@@ -450,75 +450,133 @@
 
   /**
    * Find insertion point for Code tab (main repo view)
-   * Targets the area near the green "Code" button
-   * Enhanced with broader selectors and fallbacks
+   * Uses Gitpod-style robust selectors for GHE 3.14 compatibility
+   * Handles both legacy file-navigation UI and new React-based UI
    */
   function findCodeTabInsertionPoint() {
-    // Primary: Look for the "Code" dropdown button area
-    const codeButtonSelectors = [
-      // GHE 3.14+ Code button container
-      '[data-testid="code-button"]',
-      'get-repo',
-      'details.get-repo-select-menu',
-      // The green Code button's parent container
-      '.file-navigation .BtnGroup:has(summary.btn-primary)',
-      '.file-navigation .d-flex:has([data-testid="code-button"])',
-      '.file-navigation details:has(summary.btn-primary)',
+    // Strategy 1: New React-based UI (GHE 3.14+ / GitHub dotcom new UI)
+    // Gitpod uses: xpath://*[contains(@id, 'repo-content-')]/div/div/div/div[1]/react-partial/div/div/div[2]/div[2]
+    // We'll use CSS selectors that target the same structure
+    const reactUISelectors = [
+      // React partial container - the action buttons row
+      '[id^="repo-content-"] react-partial [class*="Box-sc-"] > div:last-child',
+      '[id^="repo-content-"] .react-directory-commit-age + div',
+      // Direct targeting of the button group near Code button in React UI
+      '[id*="repo-content"] div[class*="gtBUEp"]',
+      '[id*="repo-content"] div[class*="Box-sc-"]',
     ];
 
-    for (const selector of codeButtonSelectors) {
+    for (const selector of reactUISelectors) {
       try {
         const el = document.querySelector(selector);
-        if (el) {
-          return { element: el, position: 'after' };
+        if (el && !document.querySelector('.file-navigation')) {
+          // React UI - insert in the actions area
+          return { element: el, position: 'prepend' };
         }
       } catch (e) {
-        // :has() may not be supported in older browsers, continue
+        continue;
       }
     }
 
-    // Secondary: Look for file-navigation with broader selectors
+    // Strategy 2: Legacy file-navigation UI (older GHE versions)
+    // Target the "Go to file" button area (data-hotkey="t") as Gitpod does
     const fileNav = document.querySelector('.file-navigation');
     if (fileNav) {
-      // Look for any action-like container on the right side
+      // Priority 1: Find the "Go to file" button with data-hotkey="t" (Gitpod-style)
+      const goToFileBtn = fileNav.querySelector('a[data-hotkey="t"], button[data-hotkey="t"]');
+      if (goToFileBtn) {
+        const parent = goToFileBtn.closest('.BtnGroup, .d-flex, .gap-2') || goToFileBtn.parentElement;
+        if (parent) {
+          return { element: parent, position: 'after' };
+        }
+      }
+
+      // Priority 2: Find the Code dropdown button (green button)
+      const codeButtonSelectors = [
+        'get-repo',                                    // Custom element for Code dropdown
+        'details.get-repo-select-menu',                // Legacy Code dropdown
+        '[data-testid="code-button"]',                 // New testid-based
+        'summary.btn-primary[data-ga-click*="Code"]',  // GA tracking attribute
+        'summary.btn-primary',                         // Generic green button
+        'details:has(summary.btn-primary)',            // Details containing green button
+      ];
+
+      for (const selector of codeButtonSelectors) {
+        try {
+          const codeBtn = fileNav.querySelector(selector);
+          if (codeBtn) {
+            // Insert before the Code button for visibility
+            return { element: codeBtn, position: 'before' };
+          }
+        } catch (e) {
+          continue;
+        }
+      }
+
+      // Priority 3: Action group containers in file-navigation
       const actionSelectors = [
-        '.flex-self-end',
-        '.d-flex.gap-2',
-        '.BtnGroup',
         '.file-navigation-options',
-        '.flex-justify-end',
-        '.d-md-flex',
+        '.d-flex.gap-2.flex-1.flex-justify-end',
+        '.d-flex.flex-justify-end',
+        '.flex-self-end.d-flex',
+        '.BtnGroup + .BtnGroup',
+        '.BtnGroup',
+        '.d-md-flex.flex-justify-end',
       ];
       
       for (const selector of actionSelectors) {
         const actionsArea = fileNav.querySelector(selector);
         if (actionsArea) {
-          return { element: actionsArea, position: 'inside' };
+          return { element: actionsArea, position: 'prepend' };
         }
       }
       
-      // Last resort: append to file-navigation itself
+      // Fallback: append to file-navigation itself (rightmost position)
       return { element: fileNav, position: 'append' };
     }
 
-    // Tertiary: Look for file-header (used in some GHE versions)
-    const fileHeader = document.querySelector('.file-header, .Box-header');
-    if (fileHeader) {
-      const actionsArea = fileHeader.querySelector('.BtnGroup, .d-flex, .flex-self-end');
-      if (actionsArea) {
-        return { element: actionsArea, position: 'inside' };
+    // Strategy 3: Look for repository content containers
+    const repoContentSelectors = [
+      '#repo-content-pjax-container',
+      '#repo-content-turbo-frame',
+      '[id^="repo-content-"]',
+      '.repository-content',
+    ];
+
+    for (const selector of repoContentSelectors) {
+      const repoContent = document.querySelector(selector);
+      if (repoContent) {
+        // Look for action button containers within
+        const innerSelectors = [
+          '.d-flex.gap-2',
+          '.d-flex.flex-justify-end', 
+          '.Box-header .d-flex',
+          '.file-navigation',
+        ];
+        
+        for (const innerSelector of innerSelectors) {
+          const container = repoContent.querySelector(innerSelector);
+          if (container) {
+            return { element: container, position: 'prepend' };
+          }
+        }
       }
-      return { element: fileHeader, position: 'append' };
     }
 
-    // Fallback: Look for repository-content area
-    const repoContent = document.querySelector('.repository-content, #repo-content-pjax-container');
-    if (repoContent) {
-      // Find the first suitable container
-      const container = repoContent.querySelector('.d-flex, .Box-header, .file-navigation');
-      if (container) {
-        return { element: container, position: 'append' };
+    // Strategy 4: XPath fallback for deeply nested React components (Gitpod-style)
+    try {
+      const xpathResult = document.evaluate(
+        "//*[contains(@id, 'repo-content-')]/div/div/div/div[1]//div[contains(@class, 'd-flex')]",
+        document,
+        null,
+        XPathResult.FIRST_ORDERED_NODE_TYPE,
+        null
+      );
+      if (xpathResult.singleNodeValue) {
+        return { element: xpathResult.singleNodeValue, position: 'prepend' };
       }
+    } catch (e) {
+      // XPath not supported or failed
     }
 
     return null;
@@ -705,6 +763,9 @@
 
     // Insert button based on position strategy
     switch (position) {
+      case 'before':
+        element.parentNode.insertBefore(button, element);
+        break;
       case 'after':
         element.parentNode.insertBefore(button, element.nextSibling);
         break;
@@ -734,12 +795,20 @@
    */
   function watchForChanges() {
     let debounceTimer;
+    let lastUrl = location.href;
     
     const observer = new MutationObserver((mutations) => {
       // Debounce rapid mutations
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
-        // Check if our button was removed (page navigation)
+        // Check if URL changed (SPA navigation)
+        const currentUrl = location.href;
+        if (currentUrl !== lastUrl) {
+          lastUrl = currentUrl;
+          removeButton();
+        }
+        
+        // Check if our button was removed (page navigation or DOM update)
         if (!document.getElementById(BUTTON_ID)) {
           injectButton();
         }
@@ -764,8 +833,13 @@
     setTimeout(() => injectButton(), 100);
   });
 
-  // Handle turbo/pjax navigation (GitHub uses turbo)
+  // Handle turbo/pjax/turbo-frame navigation (GitHub/GHE uses these)
   document.addEventListener('turbo:load', () => {
+    removeButton();
+    setTimeout(() => injectButton(), 100);
+  });
+  
+  document.addEventListener('turbo:frame-load', () => {
     removeButton();
     setTimeout(() => injectButton(), 100);
   });
