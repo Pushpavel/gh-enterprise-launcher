@@ -1,13 +1,54 @@
-/* Styles for Devcontainer Launcher button */
+/* Styles for Devcontainer Launcher button - v2.0.3 */
+/* Layout fixes: inline-flex container to prevent full-width expansion */
+
+/* ============================================================================
+   CONTAINER - Critical layout fix
+   The container MUST be inline-flex to sit next to the Code button,
+   not expand to fill the horizontal space on a new line.
+   ============================================================================ */
+
+.devcontainer-launcher-container {
+  display: inline-flex !important;
+  align-items: center !important;
+  flex-shrink: 0 !important;
+  vertical-align: middle !important;
+  /* Prevent block-level behavior */
+  width: auto !important;
+  max-width: fit-content !important;
+}
+
+/* GitHub utility class overrides - ensure inline behavior */
+.devcontainer-launcher-container.d-inline-flex {
+  display: inline-flex !important;
+}
+
+.devcontainer-launcher-container.flex-items-center {
+  align-items: center !important;
+}
+
+/* Margin utilities matching GitHub's Primer CSS */
+.devcontainer-launcher-container.mr-2 {
+  margin-right: 8px !important;
+}
+
+.devcontainer-launcher-container.ml-2 {
+  margin-left: 8px !important;
+}
+
+/* ============================================================================
+   BUTTON BASE STYLES
+   ============================================================================ */
 
 .devcontainer-launcher-btn {
   display: inline-flex !important;
   align-items: center !important;
   gap: 6px !important;
-  margin-left: 8px !important;
   vertical-align: middle !important;
   text-decoration: none !important;
   white-space: nowrap !important;
+  flex-shrink: 0 !important;
+  /* Ensure button doesn't expand */
+  width: auto !important;
 }
 
 /* Match GitHub's standard button styles */
@@ -42,7 +83,28 @@
   outline-offset: -2px !important;
 }
 
-/* Green primary button - ONLY for "Open Workspace" (found) state */
+/* ============================================================================
+   BUTTON VARIANTS (following Gitpod's additionalClassNames pattern)
+   ============================================================================ */
+
+/* Medium variant - slightly smaller for file headers */
+.devcontainer-launcher--medium .devcontainer-launcher-btn,
+.devcontainer-launcher-btn.devcontainer-launcher-btn--medium {
+  padding: 3px 12px !important;
+  font-size: 12px !important;
+}
+
+/* Tall variant - matches issue page buttons (2rem height) */
+.devcontainer-launcher--tall .devcontainer-launcher-btn,
+.devcontainer-launcher-btn.devcontainer-launcher-btn--tall {
+  padding: 7px 16px !important;
+  min-height: 32px !important;
+}
+
+/* ============================================================================
+   GREEN PRIMARY BUTTON - Only for "Open Workspace" (found) state
+   ============================================================================ */
+
 .devcontainer-launcher-btn.btn-primary {
   color: #ffffff !important;
   background-color: #2da44e !important;
@@ -63,6 +125,10 @@
   outline-offset: -2px !important;
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.4) !important;
 }
+
+/* ============================================================================
+   BUTTON STATES
+   ============================================================================ */
 
 /* Loading state */
 .devcontainer-launcher-btn--loading {
@@ -85,28 +151,14 @@
   to { transform: rotate(360deg); }
 }
 
-/* Found state (Open Workspace) - uses btn-primary, styled above */
-.devcontainer-launcher-btn--found {
-  /* btn-primary styles apply via the class */
-}
+/* ============================================================================
+   COMPACT VARIANT - For PR pages and tight spaces
+   ============================================================================ */
 
-/* Missing state (Create Workspace) - standard gray button */
-.devcontainer-launcher-btn--missing {
-  /* Uses default .btn gray styles */
-}
-
-/* Error state - standard gray button */
-.devcontainer-launcher-btn--error {
-  /* Uses default .btn gray styles */
-}
-
-/* Compact variant for PR pages and tight spaces */
 .devcontainer-launcher-btn--compact {
   padding: 3px 12px !important;
   font-size: 12px !important;
   line-height: 18px !important;
-  margin-left: 8px !important;
-  margin-right: 4px !important;
   gap: 4px !important;
 }
 
@@ -130,7 +182,10 @@
   }
 }
 
-/* Icon styling - consistent 16x16 */
+/* ============================================================================
+   ICON STYLING
+   ============================================================================ */
+
 .devcontainer-launcher-btn .octicon {
   width: 16px !important;
   height: 16px !important;
@@ -143,34 +198,67 @@
   height: 14px !important;
 }
 
-/* Ensure button doesn't inherit weird link styles */
+/* ============================================================================
+   LINK RESET
+   ============================================================================ */
+
 .devcontainer-launcher-btn:visited,
 .devcontainer-launcher-btn:link {
   text-decoration: none !important;
 }
 
-/* Proper spacing when inside BtnGroup */
-.BtnGroup .devcontainer-launcher-btn {
+/* ============================================================================
+   CONTEXT-SPECIFIC POSITIONING
+   These rules ensure the button fits naturally in different GitHub UI areas
+   ============================================================================ */
+
+/* Inside file-navigation (legacy UI) - float left next to other buttons */
+.file-navigation .devcontainer-launcher-container {
+  float: left !important;
+  margin-right: 8px !important;
+}
+
+/* Inside flex containers - proper flex item behavior */
+.d-flex > .devcontainer-launcher-container,
+[class*="Box-sc-"] > .devcontainer-launcher-container {
+  flex-shrink: 0 !important;
+}
+
+/* React partial containers (new GitHub UI) */
+react-partial .devcontainer-launcher-container {
+  display: inline-flex !important;
+  margin-right: 8px !important;
+}
+
+/* Sticky header (file view) */
+#StickyHeader .devcontainer-launcher-container {
+  margin-left: 8px !important;
+}
+
+/* PR header */
+.gh-header .devcontainer-launcher-container,
+.gh-header-show .devcontainer-launcher-container {
+  margin-right: 8px !important;
+}
+
+/* BtnGroup integration */
+.BtnGroup .devcontainer-launcher-container {
   margin-left: 0 !important;
   border-top-left-radius: 0 !important;
   border-bottom-left-radius: 0 !important;
   margin-left: -1px !important;
 }
 
-.BtnGroup .devcontainer-launcher-btn:first-child {
+.BtnGroup .devcontainer-launcher-container:first-child {
   border-radius: 6px !important;
   margin-left: 0 !important;
 }
 
-/* When placed in flex containers */
-.d-flex .devcontainer-launcher-btn,
-.flex-items-center .devcontainer-launcher-btn {
-  margin-left: 8px !important;
-}
+/* ============================================================================
+   DARK MODE SUPPORT
+   ============================================================================ */
 
-/* Dark mode support (GHE dark theme) */
 @media (prefers-color-scheme: dark) {
-  /* Standard gray button in dark mode */
   .devcontainer-launcher-btn.btn {
     color: #c9d1d9 !important;
     background-color: #21262d !important;
@@ -182,7 +270,6 @@
     border-color: rgba(240, 246, 252, 0.1) !important;
   }
 
-  /* Green primary in dark mode */
   .devcontainer-launcher-btn.btn-primary {
     color: #ffffff !important;
     background-color: #238636 !important;
@@ -194,9 +281,11 @@
   }
 }
 
-/* GHE dark mode class-based (if using data-color-mode) */
+/* GHE dark mode via data attributes */
 [data-color-mode="dark"] .devcontainer-launcher-btn.btn,
-[data-dark-theme="dark"] .devcontainer-launcher-btn.btn {
+[data-dark-theme="dark"] .devcontainer-launcher-btn.btn,
+[data-color-mode="dark"] .devcontainer-launcher-container .btn,
+[data-dark-theme="dark"] .devcontainer-launcher-container .btn {
   color: #c9d1d9 !important;
   background-color: #21262d !important;
   border-color: rgba(240, 246, 252, 0.1) !important;
@@ -219,20 +308,11 @@
   background-color: #2ea043 !important;
 }
 
-/* File view specific: blend with Raw/Blame/Edit buttons */
-.file-actions .devcontainer-launcher-btn,
-.Box-header .devcontainer-launcher-btn {
-  margin-left: 4px !important;
-}
+/* ============================================================================
+   SAFETY: Avoid state badge interference
+   ============================================================================ */
 
-/* PR header: proper alignment */
-.gh-header-actions .devcontainer-launcher-btn {
-  margin-right: 8px !important;
-  vertical-align: top !important;
-}
-
-/* Avoid interfering with state badges */
-.State + .devcontainer-launcher-btn,
-.IssueLabel + .devcontainer-launcher-btn {
+.State + .devcontainer-launcher-container,
+.IssueLabel + .devcontainer-launcher-container {
   display: none !important;
 }
