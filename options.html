@@ -419,9 +419,10 @@
           <strong>Available placeholders:</strong>
           <ul>
             <li><code>{ssh_url}</code> — SSH clone URL (e.g., <code>git@github.internal.com:user/repo.git</code>)</li>
-            <li><code>{branch}</code> — Current branch or ref name</li>
+            <li><code>{branch}</code> — Current branch, ref, or commit SHA (on commit pages)</li>
             <li><code>{repo}</code> — Repository name only</li>
             <li><code>{owner}</code> — Repository owner/organization</li>
+            <li><code>{name}</code> — Generated workspace name (<code>repo-branch</code>, sanitized, max 64 chars)</li>
           </ul>
         </div>
       </div>

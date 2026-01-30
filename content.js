@@ -1,5 +1,5 @@
 // Content script for GitHub Enterprise Devcontainer Launcher
-// v2.0.4 - Hotfix: robust commit view injection strategy
+// v2.0.5 - Hotfix: commit hash as branch, robust injection, name placeholder
 
 (async function() {
   'use strict';
@@ -168,36 +168,43 @@
     // ---------------------------------------------------------------------
     // gh-commit: Commit detail page
     // Targets the area near "Browse files" button for consistent placement
+    // Uses XPath to find the parent of "Browse files" link as most robust option
     // ---------------------------------------------------------------------
     {
       id: 'gh-commit',
       match: /\/commit\//,
-      // Primary: Gitpod's selector for the full-commit container
-      selector: '#repo-content-pjax-container > div > div.commit.full-commit.mt-0.px-2.pt-2',
+      // Primary: XPath to find parent of "Browse files" link (most robust)
+      selector: `xpath://a[contains(., 'Browse files')]/..`,
       fallbackSelectors: [
+        // Alternative XPath: parent of Browse files with data-testid
+        `xpath://a[@data-testid='browse-at-time-link']/..`,
         // The commit-meta bar (contains Browse files, parent commits, etc.)
+        '.commit-meta',
         '.full-commit .commit-meta',
         '.commit.full-commit .commit-meta',
         // File navigation if present
         '.file-navigation',
-        // Container with Browse files link
+        // Container with Browse files link (CSS :has)
         '.full-commit div:has(> a[href*="/tree/"])',
+        'div:has(> #browse-at-time-link)',
         // React-based commit view
         '[id^="repo-content-"] .commit-tease',
         '[id^="repo-content-"] div:has(> a[data-testid="browse-at-time-link"])',
+        // Gitpod's selector for the full-commit container
+        '#repo-content-pjax-container > div > div.commit.full-commit.mt-0.px-2.pt-2',
         // Broader fallback: the commit header area
         '#repo-content-pjax-container .full-commit',
         '#repo-content-turbo-frame .full-commit',
       ],
       // Try to insert before the "Browse files" link
-      insertBefore: '#browse-at-time-link, a[href*="/tree/"][data-testid], a.btn[href*="/tree/"]',
+      insertBefore: '#browse-at-time-link, a[href*="/tree/"][data-testid], a.btn[href*="/tree/"], a:has-text("Browse files")',
       containerProps: {
         display: 'inline-flex',
-        float: 'right',
-        marginLeft: '8px',
+        float: 'none',
+        marginLeft: '0',
         marginRight: '8px',
       },
-      position: 'inside-before',
+      position: 'prepend',
       variant: 'default',
       additionalClassNames: ['medium'],
     },
@@ -382,8 +389,17 @@
 
   /**
    * Extract current branch/ref from the page
+   * For commit pages, returns the full commit SHA
    */
   function getCurrentBranch() {
+    // Special handling for commit pages - use the commit SHA as the "branch"
+    if (/\/commit\//.test(location.pathname)) {
+      const commitMatch = location.pathname.match(/\/commit\/([a-f0-9]+)/i);
+      if (commitMatch) {
+        return commitMatch[1]; // Return full commit SHA
+      }
+    }
+    
     // Special handling for PR pages - extract the "from" branch
     if (/\/pull\//.test(location.pathname)) {
       const prBranch = getPRHeadBranch();
@@ -459,11 +475,17 @@
   }
 
   function buildLauncherUrl(owner, repo, sshUrl, branch) {
+    // Generate workspace name: repo-branch (sanitized for use in URLs)
+    const sanitizedBranch = branch.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const sanitizedRepo = repo.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
+    const workspaceName = `${sanitizedRepo}-${sanitizedBranch}`.toLowerCase().substring(0, 64);
+    
     return settings.launcherUrl
       .replace(/\{ssh_url\}/g, encodeURIComponent(sshUrl))
       .replace(/\{branch\}/g, encodeURIComponent(branch))
       .replace(/\{repo\}/g, encodeURIComponent(repo))
-      .replace(/\{owner\}/g, encodeURIComponent(owner));
+      .replace(/\{owner\}/g, encodeURIComponent(owner))
+      .replace(/\{name\}/g, encodeURIComponent(workspaceName));
   }
 
   async function checkWorkspaceStatus(repo, branch) {
