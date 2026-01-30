@@ -14,8 +14,15 @@
       --color-border-muted: #d8dee4;
       --color-accent-fg: #0969da;
       --color-success-fg: #1a7f37;
+      --color-success-bg: rgba(26, 127, 55, 0.1);
+      --color-danger-fg: #cf222e;
+      --color-danger-bg: rgba(207, 34, 46, 0.1);
+      --color-warning-fg: #9a6700;
+      --color-warning-bg: rgba(154, 103, 0, 0.1);
       --color-btn-primary-bg: #2da44e;
       --color-btn-primary-hover-bg: #2c974b;
+      --color-btn-secondary-bg: #f6f8fa;
+      --color-btn-secondary-hover-bg: #f3f4f6;
     }
 
     * {
@@ -33,7 +40,7 @@
     }
 
     .container {
-      max-width: 600px;
+      max-width: 700px;
       margin: 0 auto;
       background: var(--color-bg-default);
       border: 1px solid var(--color-border-default);
@@ -59,6 +66,29 @@
       margin: 0 0 24px 0;
     }
 
+    h2 {
+      font-size: 16px;
+      font-weight: 600;
+      margin: 24px 0 16px 0;
+      padding-top: 16px;
+      border-top: 1px solid var(--color-border-muted);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    h2:first-of-type {
+      margin-top: 0;
+      padding-top: 0;
+      border-top: none;
+    }
+
+    h2 svg {
+      width: 20px;
+      height: 20px;
+      color: var(--color-fg-muted);
+    }
+
     .form-group {
       margin-bottom: 16px;
     }
@@ -78,7 +108,8 @@
     }
 
     input[type="text"],
-    input[type="url"] {
+    input[type="url"],
+    input[type="password"] {
       width: 100%;
       padding: 5px 12px;
       font-size: 14px;
@@ -92,9 +123,20 @@
     }
 
     input[type="text"]:focus,
-    input[type="url"]:focus {
+    input[type="url"]:focus,
+    input[type="password"]:focus {
       border-color: var(--color-accent-fg);
       box-shadow: 0 0 0 3px rgba(9, 105, 218, 0.3);
+    }
+
+    .input-group {
+      display: flex;
+      gap: 8px;
+      align-items: flex-start;
+    }
+
+    .input-group input {
+      flex: 1;
     }
 
     .placeholder-info {
@@ -123,7 +165,9 @@
     }
 
     .btn {
-      display: inline-block;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
       padding: 5px 16px;
       font-size: 14px;
       font-weight: 500;
@@ -135,7 +179,13 @@
       user-select: none;
       border: 1px solid;
       border-radius: 6px;
+      text-decoration: none;
       transition: 0.2s cubic-bezier(0.3, 0, 0.5, 1);
+    }
+
+    .btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
     }
 
     .btn-primary {
@@ -144,8 +194,23 @@
       border-color: rgba(27, 31, 36, 0.15);
     }
 
-    .btn-primary:hover {
+    .btn-primary:hover:not(:disabled) {
       background-color: var(--color-btn-primary-hover-bg);
+    }
+
+    .btn-secondary {
+      color: var(--color-fg-default);
+      background-color: var(--color-btn-secondary-bg);
+      border-color: var(--color-border-default);
+    }
+
+    .btn-secondary:hover:not(:disabled) {
+      background-color: var(--color-btn-secondary-hover-bg);
+    }
+
+    .btn-sm {
+      padding: 3px 12px;
+      font-size: 12px;
     }
 
     .status {
@@ -164,13 +229,96 @@
 
     .status.success {
       color: var(--color-success-fg);
-      background: rgba(26, 127, 55, 0.1);
+      background: var(--color-success-bg);
+    }
+
+    .status.error {
+      color: var(--color-danger-fg);
+      background: var(--color-danger-bg);
+    }
+
+    .connection-status {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 6px;
+      font-size: 13px;
+      display: none;
+    }
+
+    .connection-status.show {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .connection-status.success {
+      background: var(--color-success-bg);
+      color: var(--color-success-fg);
+      border: 1px solid currentColor;
+    }
+
+    .connection-status.error {
+      background: var(--color-danger-bg);
+      color: var(--color-danger-fg);
+      border: 1px solid currentColor;
+    }
+
+    .connection-status.warning {
+      background: var(--color-warning-bg);
+      color: var(--color-warning-fg);
+      border: 1px solid currentColor;
+    }
+
+    .connection-status svg {
+      flex-shrink: 0;
     }
 
     .actions {
       margin-top: 24px;
       padding-top: 16px;
       border-top: 1px solid var(--color-border-muted);
+    }
+
+    .help-link {
+      font-size: 12px;
+      color: var(--color-accent-fg);
+      text-decoration: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      margin-top: 8px;
+    }
+
+    .help-link:hover {
+      text-decoration: underline;
+    }
+
+    .help-link svg {
+      width: 12px;
+      height: 12px;
+    }
+
+    .spinner {
+      width: 14px;
+      height: 14px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin 0.75s linear infinite;
+    }
+
+    @keyframes spin {
+      to { transform: rotate(360deg); }
+    }
+
+    .section-note {
+      font-size: 12px;
+      color: var(--color-fg-muted);
+      margin-bottom: 16px;
+      padding: 8px 12px;
+      background: var(--color-bg-subtle);
+      border-radius: 6px;
+      border-left: 3px solid var(--color-accent-fg);
     }
   </style>
 </head>
@@ -183,15 +331,81 @@
       </svg>
       Devcontainer Launcher
     </h1>
-    <p class="subtitle">Configure your GitHub Enterprise Server and launcher settings.</p>
+    <p class="subtitle">Configure your GitHub Enterprise Server and Coder integration.</p>
 
     <form id="options-form">
+      <!-- GitHub Enterprise Section -->
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 0c4.42 0 8 3.58 8 8a8.013 8.013 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A7.995 7.995 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/>
+        </svg>
+        GitHub Enterprise
+      </h2>
+
       <div class="form-group">
         <label for="gheUrl">
-          GitHub Enterprise Base URL
+          Base URL
           <span class="label-description">The root URL of your GitHub Enterprise instance (without trailing slash)</span>
         </label>
         <input type="url" id="gheUrl" name="gheUrl" placeholder="https://github.internal.com" required>
+      </div>
+
+      <!-- Coder Integration Section -->
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M0 1.75C0 .784.784 0 1.75 0h12.5C15.216 0 16 .784 16 1.75v12.5A1.75 1.75 0 0 1 14.25 16H1.75A1.75 1.75 0 0 1 0 14.25Zm1.75-.25a.25.25 0 0 0-.25.25v12.5c0 .138.112.25.25.25h12.5a.25.25 0 0 0 .25-.25V1.75a.25.25 0 0 0-.25-.25ZM4 4.75A.75.75 0 0 1 4.75 4h6.5a.75.75 0 0 1 0 1.5h-6.5A.75.75 0 0 1 4 4.75ZM4.75 7a.75.75 0 0 0 0 1.5h4.5a.75.75 0 0 0 0-1.5h-4.5Z"/>
+        </svg>
+        Coder Integration
+      </h2>
+
+      <div class="section-note">
+        Connect to your Coder deployment to automatically detect existing workspaces. The button will show "Open Workspace" for existing ones or "Create Workspace" for new repos.
+      </div>
+
+      <div class="form-group">
+        <label for="coderUrl">
+          Coder URL
+          <span class="label-description">Your Coder deployment URL</span>
+        </label>
+        <input type="url" id="coderUrl" name="coderUrl" placeholder="https://coder.internal.com">
+      </div>
+
+      <div class="form-group">
+        <label for="coderApiToken">
+          API Token
+          <span class="label-description">Generate a token from your Coder account settings</span>
+        </label>
+        <div class="input-group">
+          <input type="password" id="coderApiToken" name="coderApiToken" placeholder="••••••••••••••••">
+          <button type="button" id="verifyBtn" class="btn btn-secondary btn-sm">
+            Verify
+          </button>
+        </div>
+        <a href="#" id="getTokenLink" class="help-link" target="_blank">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+            <path d="M9 2a1 1 0 0 0-1 1v2.07A7.479 7.479 0 0 0 3.07 10H1a1 1 0 0 0 0 2h2.07A7.479 7.479 0 0 0 8 16.93V19a1 1 0 0 0 2 0v-2.07A7.479 7.479 0 0 0 14.93 12H17a1 1 0 0 0 0-2h-2.07A7.479 7.479 0 0 0 10 5.07V3a1 1 0 0 0-1-1Z"/>
+          </svg>
+          Get API Token from Coder →
+        </a>
+      </div>
+
+      <div id="connectionStatus" class="connection-status">
+        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 16A8 8 0 1 0 8 0a8 8 0 0 0 0 16Zm3.78-9.72a.751.751 0 0 0-.018-1.042.751.751 0 0 0-1.042-.018L6.75 9.19 5.28 7.72a.751.751 0 0 0-1.042.018.751.751 0 0 0-.018 1.042l2 2a.75.75 0 0 0 1.06 0Z"/>
+        </svg>
+        <span id="connectionStatusText"></span>
+      </div>
+
+      <!-- Fallback Launcher Section -->
+      <h2>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z"/>
+        </svg>
+        Fallback Launcher
+      </h2>
+
+      <div class="section-note">
+        When a workspace doesn't exist, this URL will be used to create a new one. If Coder API is not configured, this will be the primary launch method.
       </div>
 
       <div class="form-group">
@@ -199,13 +413,15 @@
           Launcher Template URL
           <span class="label-description">URL template with placeholders for repository details</span>
         </label>
-        <input type="text" id="launcherUrl" name="launcherUrl" placeholder="https://launcher.com/start?repo={ssh_url}&ref={branch}" required>
+        <input type="text" id="launcherUrl" name="launcherUrl" placeholder="https://coder.internal.com/templates/devcontainer/workspace?param.repo={ssh_url}&param.branch={branch}">
         
         <div class="placeholder-info">
           <strong>Available placeholders:</strong>
           <ul>
             <li><code>{ssh_url}</code> — SSH clone URL (e.g., <code>git@github.internal.com:user/repo.git</code>)</li>
             <li><code>{branch}</code> — Current branch or ref name</li>
+            <li><code>{repo}</code> — Repository name only</li>
+            <li><code>{owner}</code> — Repository owner/organization</li>
           </ul>
         </div>
       </div>

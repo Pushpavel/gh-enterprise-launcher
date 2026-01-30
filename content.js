@@ -4,10 +4,10 @@
   'use strict';
 
   // Load settings from storage
-  const settings = await chrome.storage.sync.get(['gheUrl', 'launcherUrl']);
+  const settings = await chrome.storage.sync.get(['gheUrl', 'launcherUrl', 'coderUrl', 'coderApiToken']);
   
   // Exit if not configured
-  if (!settings.gheUrl || !settings.launcherUrl) {
+  if (!settings.gheUrl) {
     return;
   }
 
@@ -18,6 +18,7 @@
   }
 
   const BUTTON_ID = 'devcontainer-launcher-btn';
+  const hasCoderApi = !!(settings.coderUrl && settings.coderApiToken);
 
   /**
    * Determine the current page context
@@ -173,16 +174,33 @@
   /**
    * Build the launcher URL with placeholders replaced
    */
-  function buildLauncherUrl(sshUrl, branch) {
+  function buildLauncherUrl(owner, repo, sshUrl, branch) {
     return settings.launcherUrl
       .replace(/\{ssh_url\}/g, encodeURIComponent(sshUrl))
-      .replace(/\{branch\}/g, encodeURIComponent(branch));
+      .replace(/\{branch\}/g, encodeURIComponent(branch))
+      .replace(/\{repo\}/g, encodeURIComponent(repo))
+      .replace(/\{owner\}/g, encodeURIComponent(owner));
   }
 
   /**
-   * Create the launcher button element
+   * Check workspace status via background script
    */
-  function createLauncherButton(onClick, variant = 'default') {
+  async function checkWorkspaceStatus(repo, branch) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: 'CHECK_WORKSPACE', repo, branch },
+        (response) => {
+          resolve(response || { status: 'error', error: 'No response' });
+        }
+      );
+    });
+  }
+
+  /**
+   * Create the launcher button element with smart states
+   */
+  function createLauncherButton(repoInfo, variant = 'default') {
+    const { owner, repo } = repoInfo;
     const btn = document.createElement('a');
     btn.id = BUTTON_ID;
     btn.href = '#';
@@ -190,29 +208,144 @@
     
     // Apply variant-specific classes
     if (variant === 'compact') {
-      btn.className = 'btn btn-sm devcontainer-launcher-btn devcontainer-launcher-btn--compact';
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
-          <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
-        </svg>
-        <span class="devcontainer-launcher-btn__text">Devcontainer</span>
-      `;
+      btn.className = 'btn btn-sm devcontainer-launcher-btn devcontainer-launcher-btn--compact devcontainer-launcher-btn--loading';
     } else {
-      btn.className = 'btn btn-primary devcontainer-launcher-btn';
-      btn.innerHTML = `
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 16 16" fill="currentColor" style="margin-right: 4px; vertical-align: text-bottom;">
-          <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
-        </svg>
-        Launch Devcontainer
-      `;
+      btn.className = 'btn btn-primary devcontainer-launcher-btn devcontainer-launcher-btn--loading';
     }
     
-    btn.addEventListener('click', (e) => {
-      e.preventDefault();
-      onClick();
-    });
+    // Initial loading state
+    setButtonState(btn, 'loading', variant);
+    
+    // Check workspace status
+    const branch = getCurrentBranch();
+    
+    if (hasCoderApi) {
+      // Use Coder API to check workspace
+      checkWorkspaceStatus(repo, branch).then((result) => {
+        btn.classList.remove('devcontainer-launcher-btn--loading');
+        
+        if (result.status === 'found') {
+          setButtonState(btn, 'found', variant, result);
+          btn.onclick = (e) => {
+            e.preventDefault();
+            window.open(result.workspaceUrl, '_blank');
+          };
+        } else if (result.status === 'missing') {
+          setButtonState(btn, 'missing', variant, result);
+          btn.onclick = (e) => {
+            e.preventDefault();
+            const currentBranch = getCurrentBranch();
+            const sshUrl = getSSHUrl(owner, repo);
+            const launcherUrl = buildLauncherUrl(owner, repo, sshUrl, currentBranch);
+            window.open(launcherUrl, '_blank');
+          };
+        } else if (result.status === 'unconfigured') {
+          // Fall back to simple launcher
+          setButtonState(btn, 'default', variant);
+          btn.onclick = (e) => {
+            e.preventDefault();
+            const currentBranch = getCurrentBranch();
+            const sshUrl = getSSHUrl(owner, repo);
+            const launcherUrl = buildLauncherUrl(owner, repo, sshUrl, currentBranch);
+            window.open(launcherUrl, '_blank');
+          };
+        } else {
+          // Error state - show default with error tooltip
+          setButtonState(btn, 'error', variant, result);
+          btn.onclick = (e) => {
+            e.preventDefault();
+            const currentBranch = getCurrentBranch();
+            const sshUrl = getSSHUrl(owner, repo);
+            const launcherUrl = buildLauncherUrl(owner, repo, sshUrl, currentBranch);
+            window.open(launcherUrl, '_blank');
+          };
+        }
+      });
+    } else {
+      // No Coder API - use simple launcher mode
+      btn.classList.remove('devcontainer-launcher-btn--loading');
+      setButtonState(btn, 'default', variant);
+      btn.onclick = (e) => {
+        e.preventDefault();
+        const currentBranch = getCurrentBranch();
+        const sshUrl = getSSHUrl(owner, repo);
+        const launcherUrl = buildLauncherUrl(owner, repo, sshUrl, currentBranch);
+        window.open(launcherUrl, '_blank');
+      };
+    }
     
     return btn;
+  }
+
+  /**
+   * Set button visual state
+   */
+  function setButtonState(btn, state, variant, data = {}) {
+    // Remove all state classes
+    btn.classList.remove(
+      'devcontainer-launcher-btn--loading',
+      'devcontainer-launcher-btn--found',
+      'devcontainer-launcher-btn--missing',
+      'devcontainer-launcher-btn--error'
+    );
+    
+    const isCompact = variant === 'compact';
+    const iconSize = isCompact ? 14 : 16;
+    
+    switch (state) {
+      case 'loading':
+        btn.classList.add('devcontainer-launcher-btn--loading');
+        btn.innerHTML = `
+          <span class="devcontainer-launcher-spinner"></span>
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Checking...</span>' : 'Checking...'}
+        `;
+        btn.title = 'Checking for existing workspace...';
+        break;
+        
+      case 'found':
+        btn.classList.add('devcontainer-launcher-btn--found');
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
+            <path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z"/>
+          </svg>
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Open Workspace</span>' : 'Open Workspace'}
+        `;
+        btn.title = data.workspaceName ? `Open workspace: ${data.workspaceName}` : 'Open existing workspace';
+        break;
+        
+      case 'missing':
+        btn.classList.add('devcontainer-launcher-btn--missing');
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
+            <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
+          </svg>
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Create Workspace</span>' : 'Create Workspace'}
+        `;
+        btn.title = data.workspaceName ? `Create workspace: ${data.workspaceName}` : 'Create new workspace';
+        break;
+        
+      case 'error':
+        btn.classList.add('devcontainer-launcher-btn--error');
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
+            <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
+          </svg>
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Launch</span>' : 'Launch Devcontainer'}
+        `;
+        btn.title = data.error ? `Error: ${data.error}. Click to launch anyway.` : 'Launch devcontainer';
+        break;
+        
+      case 'default':
+      default:
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${isCompact ? '' : 'margin-right: 4px; vertical-align: text-bottom;'}">
+            <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
+          </svg>
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Devcontainer</span>' : 'Launch Devcontainer'}
+        `;
+        btn.title = 'Launch devcontainer';
+        break;
+    }
   }
 
   /**
@@ -394,6 +527,11 @@
       return;
     }
 
+    // Check if we have launcher URL configured
+    if (!settings.launcherUrl && !hasCoderApi) {
+      return;
+    }
+
     // Find appropriate insertion point based on context
     let insertionInfo;
     switch (context) {
@@ -418,16 +556,8 @@
     }
 
     const { element, position, variant = 'default' } = insertionInfo;
-    const { owner, repo } = repoInfo;
-    const branch = getCurrentBranch();
-    const sshUrl = getSSHUrl(owner, repo);
     
-    const button = createLauncherButton(() => {
-      // Re-fetch branch in case user changed it
-      const currentBranch = getCurrentBranch();
-      const launcherUrl = buildLauncherUrl(sshUrl, currentBranch);
-      window.open(launcherUrl, '_blank');
-    }, variant);
+    const button = createLauncherButton(repoInfo, variant);
 
     // Insert button based on position strategy
     switch (position) {
