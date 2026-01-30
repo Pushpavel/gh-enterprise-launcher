@@ -45,10 +45,71 @@
   }
 
   /**
+   * Check if current page is a Pull Request page
+   */
+  function isPullRequestPage() {
+    return /\/pull\/\d+/.test(location.pathname);
+  }
+
+  /**
+   * Extract the source branch from a PR page
+   * Looks for the "merging [source] into [target]" pattern
+   */
+  function getPRSourceBranch() {
+    // PR header meta selectors - look for the source branch (left side of merge arrow)
+    const prBranchSelectors = [
+      // Modern GHE/GitHub: span.commit-ref elements in PR header
+      '.gh-header-meta .commit-ref:first-of-type',
+      '.gh-header-meta span.commit-ref',
+      // PR header with "from" branch
+      '.pull-request-ref-selector .commit-ref:first-child',
+      // Base/head ref labels
+      '.base-ref .commit-ref',
+      '[data-pjax-replace] .commit-ref:first-of-type',
+      // PR compare selectors
+      '.range-editor .commit-ref:last-of-type',
+      // Timeline header
+      '.timeline-comment-header .commit-ref',
+      // Generic commit-ref (try first one, usually source)
+      '.commit-ref',
+    ];
+
+    for (const selector of prBranchSelectors) {
+      const elements = document.querySelectorAll(selector);
+      // For PR pages, we want the HEAD branch (source), which is typically
+      // the second commit-ref in the header (user wants to merge FROM this branch)
+      for (const el of elements) {
+        const text = el.textContent?.trim();
+        // Skip if it looks like the base branch (main, master, develop)
+        // or if it contains owner: prefix like "owner:branch"
+        if (text && text.length > 0) {
+          // Extract just the branch name if it has owner: prefix
+          const branchMatch = text.match(/^(?:[^:]+:)?(.+)$/);
+          if (branchMatch) {
+            return branchMatch[1];
+          }
+        }
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * Extract current branch/ref from the page
    * Tries multiple selectors for GHE 3.14 compatibility
+   * Special handling for PR pages to get source branch
    */
   function getCurrentBranch() {
+    // Special handling for PR pages - get the source branch
+    if (isPullRequestPage()) {
+      const prBranch = getPRSourceBranch();
+      if (prBranch) {
+        return prBranch;
+      }
+      // Fall through to default detection if PR branch scraping fails
+    }
+
     // Try various selectors used in different GHE versions
     const selectors = [
       // GHE 3.14+ branch selector button
@@ -90,6 +151,35 @@
   }
 
   /**
+   * Generate a sanitized workspace name from repo and branch
+   * - Lowercase
+   * - Replace special chars (/ _ .) with -
+   * - Trim to 30 chars (Coder limit)
+   */
+  function generateWorkspaceName(repo, branch) {
+    const combined = `${repo}-${branch}`;
+    const sanitized = combined
+      .toLowerCase()
+      .replace(/[/_\.]/g, '-')  // Replace / _ . with -
+      .replace(/[^a-z0-9-]/g, '-')  // Replace other special chars with -
+      .replace(/-+/g, '-')  // Collapse multiple dashes
+      .replace(/^-|-$/g, '');  // Trim leading/trailing dashes
+    
+    // Trim to 30 chars, avoiding cutting mid-word if possible
+    if (sanitized.length <= 30) {
+      return sanitized;
+    }
+    
+    // Try to cut at a dash boundary
+    const truncated = sanitized.substring(0, 30);
+    const lastDash = truncated.lastIndexOf('-');
+    if (lastDash > 20) {
+      return truncated.substring(0, lastDash);
+    }
+    return truncated.replace(/-$/, '');
+  }
+
+  /**
    * Construct SSH URL from repo info
    */
   function getSSHUrl(owner, repo) {
@@ -100,10 +190,18 @@
   /**
    * Build the launcher URL with placeholders replaced
    */
-  function buildLauncherUrl(sshUrl, branch) {
-    return settings.launcherUrl
+  function buildLauncherUrl(sshUrl, branch, workspaceName) {
+    let url = settings.launcherUrl
       .replace(/\{ssh_url\}/g, encodeURIComponent(sshUrl))
       .replace(/\{branch\}/g, encodeURIComponent(branch));
+    
+    // Append workspace name parameter if we have one
+    if (workspaceName) {
+      const separator = url.includes('?') ? '&' : '?';
+      url += `${separator}name=${encodeURIComponent(workspaceName)}`;
+    }
+    
+    return url;
   }
 
   /**
@@ -189,7 +287,8 @@
     const button = createLauncherButton(() => {
       // Re-fetch branch in case user changed it
       const currentBranch = getCurrentBranch();
-      const launcherUrl = buildLauncherUrl(sshUrl, currentBranch);
+      const workspaceName = generateWorkspaceName(repo, currentBranch);
+      const launcherUrl = buildLauncherUrl(sshUrl, currentBranch, workspaceName);
       window.open(launcherUrl, '_blank');
     });
 
