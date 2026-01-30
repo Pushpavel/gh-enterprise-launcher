@@ -1,5 +1,5 @@
 // Content script for GitHub Enterprise Devcontainer Launcher
-// v2.0.3 - Gitpod-style selectors with robust layout handling
+// v2.0.4 - Hotfix: robust commit view injection strategy
 
 (async function() {
   'use strict';
@@ -167,16 +167,35 @@
 
     // ---------------------------------------------------------------------
     // gh-commit: Commit detail page
+    // Targets the area near "Browse files" button for consistent placement
     // ---------------------------------------------------------------------
     {
       id: 'gh-commit',
       match: /\/commit\//,
+      // Primary: Gitpod's selector for the full-commit container
       selector: '#repo-content-pjax-container > div > div.commit.full-commit.mt-0.px-2.pt-2',
-      insertBefore: '#browse-at-time-link',
+      fallbackSelectors: [
+        // The commit-meta bar (contains Browse files, parent commits, etc.)
+        '.full-commit .commit-meta',
+        '.commit.full-commit .commit-meta',
+        // File navigation if present
+        '.file-navigation',
+        // Container with Browse files link
+        '.full-commit div:has(> a[href*="/tree/"])',
+        // React-based commit view
+        '[id^="repo-content-"] .commit-tease',
+        '[id^="repo-content-"] div:has(> a[data-testid="browse-at-time-link"])',
+        // Broader fallback: the commit header area
+        '#repo-content-pjax-container .full-commit',
+        '#repo-content-turbo-frame .full-commit',
+      ],
+      // Try to insert before the "Browse files" link
+      insertBefore: '#browse-at-time-link, a[href*="/tree/"][data-testid], a.btn[href*="/tree/"]',
       containerProps: {
         display: 'inline-flex',
         float: 'right',
         marginLeft: '8px',
+        marginRight: '8px',
       },
       position: 'inside-before',
       variant: 'default',
