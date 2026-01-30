@@ -43,9 +43,64 @@
   box-shadow: inset 0 0 0 3px rgba(255, 255, 255, 0.4) !important;
 }
 
+/* Compact variant for PR pages and tight spaces */
+.devcontainer-launcher-btn--compact {
+  padding: 3px 12px !important;
+  font-size: 12px !important;
+  line-height: 18px !important;
+  margin-left: 8px !important;
+  margin-right: 4px !important;
+  gap: 4px !important;
+}
+
+.devcontainer-launcher-btn--compact .octicon {
+  width: 14px !important;
+  height: 14px !important;
+}
+
+.devcontainer-launcher-btn--compact .devcontainer-launcher-btn__text {
+  display: inline !important;
+}
+
+/* Hide text on very narrow screens for compact variant */
+@media (max-width: 768px) {
+  .devcontainer-launcher-btn--compact .devcontainer-launcher-btn__text {
+    display: none !important;
+  }
+  
+  .devcontainer-launcher-btn--compact {
+    padding: 3px 8px !important;
+  }
+}
+
 /* Icon styling */
 .devcontainer-launcher-btn svg {
   flex-shrink: 0 !important;
+}
+
+/* Ensure button doesn't inherit weird link styles */
+.devcontainer-launcher-btn:visited,
+.devcontainer-launcher-btn:link {
+  color: inherit !important;
+}
+
+/* Proper spacing when inside BtnGroup */
+.BtnGroup .devcontainer-launcher-btn {
+  margin-left: 0 !important;
+  border-top-left-radius: 0 !important;
+  border-bottom-left-radius: 0 !important;
+  margin-left: -1px !important;
+}
+
+.BtnGroup .devcontainer-launcher-btn:first-child {
+  border-radius: 6px !important;
+  margin-left: 0 !important;
+}
+
+/* When placed in flex containers */
+.d-flex .devcontainer-launcher-btn,
+.flex-items-center .devcontainer-launcher-btn {
+  margin-left: 8px !important;
 }
 
 /* Dark mode support (GHE dark theme) */
@@ -74,4 +129,22 @@
 [data-color-mode="dark"] .devcontainer-launcher-btn.btn-primary:hover,
 [data-dark-theme="dark"] .devcontainer-launcher-btn.btn-primary:hover {
   background-color: #2ea043 !important;
+}
+
+/* File view specific: blend with Raw/Blame/Edit buttons */
+.file-actions .devcontainer-launcher-btn,
+.Box-header .devcontainer-launcher-btn {
+  margin-left: 4px !important;
+}
+
+/* PR header: proper alignment */
+.gh-header-actions .devcontainer-launcher-btn {
+  margin-right: 8px !important;
+  vertical-align: top !important;
+}
+
+/* Avoid interfering with state badges */
+.State + .devcontainer-launcher-btn,
+.IssueLabel + .devcontainer-launcher-btn {
+  display: none !important;
 }
