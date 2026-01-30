@@ -478,7 +478,7 @@
     // Generate workspace name: repo-branch (sanitized for use in URLs)
     const sanitizedBranch = branch.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     const sanitizedRepo = repo.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
-    const workspaceName = `${sanitizedRepo}-${sanitizedBranch}`.toLowerCase().substring(0, 64);
+    const workspaceName = `${sanitizedRepo}-${sanitizedBranch}`.toLowerCase().substring(0, 32);
     
     return settings.launcherUrl
       .replace(/\{ssh_url\}/g, encodeURIComponent(sshUrl))
