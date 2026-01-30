@@ -3,14 +3,14 @@
 .devcontainer-launcher-btn {
   display: inline-flex !important;
   align-items: center !important;
+  gap: 6px !important;
   margin-left: 8px !important;
   vertical-align: middle !important;
   text-decoration: none !important;
   white-space: nowrap !important;
-  gap: 4px !important;
 }
 
-/* Match GitHub's button styles for consistency */
+/* Match GitHub's standard button styles */
 .devcontainer-launcher-btn.btn {
   padding: 5px 16px !important;
   font-size: 14px !important;
@@ -21,9 +21,28 @@
   user-select: none !important;
   transition: 80ms cubic-bezier(0.33, 1, 0.68, 1) !important;
   transition-property: color, background-color, box-shadow, border-color !important;
+  /* Standard gray GitHub button (default) */
+  color: #24292f !important;
+  background-color: #f6f8fa !important;
+  border: 1px solid rgba(31, 35, 40, 0.15) !important;
+  box-shadow: 0 1px 0 rgba(31, 35, 40, 0.04) !important;
 }
 
-/* Default state - green primary button */
+.devcontainer-launcher-btn.btn:hover {
+  background-color: #f3f4f6 !important;
+  border-color: rgba(31, 35, 40, 0.15) !important;
+}
+
+.devcontainer-launcher-btn.btn:active {
+  background-color: hsla(220, 14%, 93%, 1) !important;
+}
+
+.devcontainer-launcher-btn.btn:focus {
+  outline: 2px solid #0969da !important;
+  outline-offset: -2px !important;
+}
+
+/* Green primary button - ONLY for "Open Workspace" (found) state */
 .devcontainer-launcher-btn.btn-primary {
   color: #ffffff !important;
   background-color: #2da44e !important;
@@ -47,7 +66,7 @@
 
 /* Loading state */
 .devcontainer-launcher-btn--loading {
-  opacity: 0.8 !important;
+  opacity: 0.7 !important;
   cursor: wait !important;
 }
 
@@ -66,43 +85,19 @@
   to { transform: rotate(360deg); }
 }
 
-/* Found state - green (workspace exists) */
-.devcontainer-launcher-btn--found.btn-primary,
-.devcontainer-launcher-btn--found.btn {
-  color: #ffffff !important;
-  background-color: #2da44e !important;
-  border-color: rgba(27, 31, 36, 0.15) !important;
+/* Found state (Open Workspace) - uses btn-primary, styled above */
+.devcontainer-launcher-btn--found {
+  /* btn-primary styles apply via the class */
 }
 
-.devcontainer-launcher-btn--found.btn-primary:hover,
-.devcontainer-launcher-btn--found.btn:hover {
-  background-color: #2c974b !important;
+/* Missing state (Create Workspace) - standard gray button */
+.devcontainer-launcher-btn--missing {
+  /* Uses default .btn gray styles */
 }
 
-/* Missing state - blue (create new workspace) */
-.devcontainer-launcher-btn--missing.btn-primary,
-.devcontainer-launcher-btn--missing.btn {
-  color: #ffffff !important;
-  background-color: #0969da !important;
-  border-color: rgba(27, 31, 36, 0.15) !important;
-}
-
-.devcontainer-launcher-btn--missing.btn-primary:hover,
-.devcontainer-launcher-btn--missing.btn:hover {
-  background-color: #0860ca !important;
-}
-
-/* Error state - orange/warning */
-.devcontainer-launcher-btn--error.btn-primary,
-.devcontainer-launcher-btn--error.btn {
-  color: #ffffff !important;
-  background-color: #bf8700 !important;
-  border-color: rgba(27, 31, 36, 0.15) !important;
-}
-
-.devcontainer-launcher-btn--error.btn-primary:hover,
-.devcontainer-launcher-btn--error.btn:hover {
-  background-color: #9a6700 !important;
+/* Error state - standard gray button */
+.devcontainer-launcher-btn--error {
+  /* Uses default .btn gray styles */
 }
 
 /* Compact variant for PR pages and tight spaces */
@@ -113,11 +108,6 @@
   margin-left: 8px !important;
   margin-right: 4px !important;
   gap: 4px !important;
-}
-
-.devcontainer-launcher-btn--compact .octicon {
-  width: 14px !important;
-  height: 14px !important;
 }
 
 .devcontainer-launcher-btn--compact .devcontainer-launcher-btn__text {
@@ -140,15 +130,23 @@
   }
 }
 
-/* Icon styling */
-.devcontainer-launcher-btn svg {
+/* Icon styling - consistent 16x16 */
+.devcontainer-launcher-btn .octicon {
+  width: 16px !important;
+  height: 16px !important;
   flex-shrink: 0 !important;
+  vertical-align: text-bottom !important;
+}
+
+.devcontainer-launcher-btn--compact .octicon {
+  width: 14px !important;
+  height: 14px !important;
 }
 
 /* Ensure button doesn't inherit weird link styles */
 .devcontainer-launcher-btn:visited,
 .devcontainer-launcher-btn:link {
-  color: inherit !important;
+  text-decoration: none !important;
 }
 
 /* Proper spacing when inside BtnGroup */
@@ -172,61 +170,53 @@
 
 /* Dark mode support (GHE dark theme) */
 @media (prefers-color-scheme: dark) {
-  .devcontainer-launcher-btn.btn-primary,
-  .devcontainer-launcher-btn--found.btn-primary,
-  .devcontainer-launcher-btn--found.btn {
+  /* Standard gray button in dark mode */
+  .devcontainer-launcher-btn.btn {
+    color: #c9d1d9 !important;
+    background-color: #21262d !important;
+    border-color: rgba(240, 246, 252, 0.1) !important;
+  }
+
+  .devcontainer-launcher-btn.btn:hover {
+    background-color: #30363d !important;
+    border-color: rgba(240, 246, 252, 0.1) !important;
+  }
+
+  /* Green primary in dark mode */
+  .devcontainer-launcher-btn.btn-primary {
+    color: #ffffff !important;
     background-color: #238636 !important;
     border-color: rgba(240, 246, 252, 0.1) !important;
   }
 
-  .devcontainer-launcher-btn.btn-primary:hover,
-  .devcontainer-launcher-btn--found.btn-primary:hover,
-  .devcontainer-launcher-btn--found.btn:hover {
+  .devcontainer-launcher-btn.btn-primary:hover {
     background-color: #2ea043 !important;
-  }
-
-  .devcontainer-launcher-btn--missing.btn-primary,
-  .devcontainer-launcher-btn--missing.btn {
-    background-color: #1f6feb !important;
-    border-color: rgba(240, 246, 252, 0.1) !important;
-  }
-
-  .devcontainer-launcher-btn--missing.btn-primary:hover,
-  .devcontainer-launcher-btn--missing.btn:hover {
-    background-color: #388bfd !important;
-  }
-
-  .devcontainer-launcher-btn--error.btn-primary,
-  .devcontainer-launcher-btn--error.btn {
-    background-color: #9e6a03 !important;
-    border-color: rgba(240, 246, 252, 0.1) !important;
   }
 }
 
 /* GHE dark mode class-based (if using data-color-mode) */
+[data-color-mode="dark"] .devcontainer-launcher-btn.btn,
+[data-dark-theme="dark"] .devcontainer-launcher-btn.btn {
+  color: #c9d1d9 !important;
+  background-color: #21262d !important;
+  border-color: rgba(240, 246, 252, 0.1) !important;
+}
+
+[data-color-mode="dark"] .devcontainer-launcher-btn.btn:hover,
+[data-dark-theme="dark"] .devcontainer-launcher-btn.btn:hover {
+  background-color: #30363d !important;
+}
+
 [data-color-mode="dark"] .devcontainer-launcher-btn.btn-primary,
-[data-dark-theme="dark"] .devcontainer-launcher-btn.btn-primary,
-[data-color-mode="dark"] .devcontainer-launcher-btn--found.btn,
-[data-dark-theme="dark"] .devcontainer-launcher-btn--found.btn {
+[data-dark-theme="dark"] .devcontainer-launcher-btn.btn-primary {
+  color: #ffffff !important;
   background-color: #238636 !important;
   border-color: rgba(240, 246, 252, 0.1) !important;
 }
 
 [data-color-mode="dark"] .devcontainer-launcher-btn.btn-primary:hover,
-[data-dark-theme="dark"] .devcontainer-launcher-btn.btn-primary:hover,
-[data-color-mode="dark"] .devcontainer-launcher-btn--found.btn:hover,
-[data-dark-theme="dark"] .devcontainer-launcher-btn--found.btn:hover {
+[data-dark-theme="dark"] .devcontainer-launcher-btn.btn-primary:hover {
   background-color: #2ea043 !important;
-}
-
-[data-color-mode="dark"] .devcontainer-launcher-btn--missing.btn,
-[data-dark-theme="dark"] .devcontainer-launcher-btn--missing.btn {
-  background-color: #1f6feb !important;
-}
-
-[data-color-mode="dark"] .devcontainer-launcher-btn--missing.btn:hover,
-[data-dark-theme="dark"] .devcontainer-launcher-btn--missing.btn:hover {
-  background-color: #388bfd !important;
 }
 
 /* File view specific: blend with Raw/Blame/Edit buttons */

@@ -114,8 +114,19 @@
 
   /**
    * Extract current branch/ref from the page
+   * For PR pages, extracts the "from" branch (head branch)
    */
   function getCurrentBranch() {
+    const context = getPageContext();
+    
+    // Special handling for PR pages - extract the "from" branch
+    if (context === 'pr-detail' || context === 'pr-file-view') {
+      const prBranch = getPRHeadBranch();
+      if (prBranch) {
+        return prBranch;
+      }
+    }
+    
     // Try various selectors used in different GHE versions
     const selectors = [
       // GHE 3.14+ branch selector button
@@ -152,15 +163,95 @@
       return match[2];
     }
 
-    // For PR file views, try to get the head branch
-    const prBranchEl = document.querySelector('.head-ref a, .commit-ref.head-ref');
-    if (prBranchEl) {
-      const text = prBranchEl.textContent?.trim();
-      if (text) return text;
-    }
-
     // Default to main/master
     return 'main';
+  }
+
+  /**
+   * Extract the PR head branch ("from" branch)
+   * Handles: "p.janakirama wants to merge ... into main from mongo"
+   */
+  function getPRHeadBranch() {
+    // Method 1: Look for .commit-ref elements in .gh-header-meta
+    // The head (from) branch is typically the second .commit-ref or has class .head-ref
+    const headRefSelectors = [
+      '.gh-header-meta .head-ref a',
+      '.gh-header-meta .head-ref',
+      '.gh-header-meta .commit-ref.head-ref a',
+      '.gh-header-meta .commit-ref.head-ref',
+    ];
+    
+    for (const selector of headRefSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const text = el.textContent?.trim();
+        if (text) {
+          // Remove owner prefix if present (e.g., "owner:branch" -> "branch")
+          return text.includes(':') ? text.split(':').pop() : text;
+        }
+      }
+    }
+    
+    // Method 2: Find all .commit-ref in .gh-header-meta, the second one is usually head branch
+    const commitRefs = document.querySelectorAll('.gh-header-meta .commit-ref');
+    if (commitRefs.length >= 2) {
+      const headRef = commitRefs[1]; // Second ref is the "from" branch
+      const text = headRef.textContent?.trim();
+      if (text) {
+        return text.includes(':') ? text.split(':').pop() : text;
+      }
+    }
+    
+    // Method 3: Parse the "into X from Y" text pattern
+    const headerMeta = document.querySelector('.gh-header-meta');
+    if (headerMeta) {
+      const text = headerMeta.textContent || '';
+      // Match "from <branch>" pattern - the branch is typically the last word after "from"
+      const fromMatch = text.match(/from\s+(\S+)\s*$/i);
+      if (fromMatch) {
+        return fromMatch[1];
+      }
+      
+      // Alternative: look for anchor tag immediately after "from" text
+      const walker = document.createTreeWalker(headerMeta, NodeFilter.SHOW_TEXT, null, false);
+      while (walker.nextNode()) {
+        if (walker.currentNode.textContent?.includes('from')) {
+          // Check if next sibling is an anchor with branch name
+          let sibling = walker.currentNode.nextSibling;
+          while (sibling) {
+            if (sibling.nodeType === Node.ELEMENT_NODE) {
+              const anchor = sibling.tagName === 'A' ? sibling : sibling.querySelector?.('a');
+              if (anchor) {
+                const branchText = anchor.textContent?.trim();
+                if (branchText && !branchText.includes(' ')) {
+                  return branchText.includes(':') ? branchText.split(':').pop() : branchText;
+                }
+              }
+            }
+            sibling = sibling.nextSibling;
+          }
+        }
+      }
+    }
+    
+    // Method 4: Look in PR comparison header
+    const compareSelectors = [
+      '.range-editor .head-ref',
+      '.compare .head-ref',
+      '[data-pjax="#js-repo-pjax-container"] .head-ref',
+    ];
+    
+    for (const selector of compareSelectors) {
+      const el = document.querySelector(selector);
+      if (el) {
+        const text = el.textContent?.trim();
+        if (text) {
+          return text.includes(':') ? text.split(':').pop() : text;
+        }
+      }
+    }
+    
+    return null;
   }
 
   /**
@@ -206,11 +297,11 @@
     btn.href = '#';
     btn.setAttribute('role', 'button');
     
-    // Apply variant-specific classes
+    // Start with standard gray btn look (loading state)
     if (variant === 'compact') {
       btn.className = 'btn btn-sm devcontainer-launcher-btn devcontainer-launcher-btn--compact devcontainer-launcher-btn--loading';
     } else {
-      btn.className = 'btn btn-primary devcontainer-launcher-btn devcontainer-launcher-btn--loading';
+      btn.className = 'btn devcontainer-launcher-btn devcontainer-launcher-btn--loading';
     }
     
     // Initial loading state
@@ -279,6 +370,7 @@
 
   /**
    * Set button visual state
+   * Uses standard gray btn for all states EXCEPT 'found' which uses green btn-primary
    */
   function setButtonState(btn, state, variant, data = {}) {
     // Remove all state classes
@@ -286,11 +378,15 @@
       'devcontainer-launcher-btn--loading',
       'devcontainer-launcher-btn--found',
       'devcontainer-launcher-btn--missing',
-      'devcontainer-launcher-btn--error'
+      'devcontainer-launcher-btn--error',
+      'btn-primary'
     );
     
     const isCompact = variant === 'compact';
-    const iconSize = isCompact ? 14 : 16;
+    const iconSize = 16; // Consistent 16x16 icons
+    
+    // Icon with proper alignment
+    const iconStyle = 'vertical-align: text-bottom; flex-shrink: 0;';
     
     switch (state) {
       case 'loading':
@@ -303,9 +399,10 @@
         break;
         
       case 'found':
-        btn.classList.add('devcontainer-launcher-btn--found');
+        // SUCCESS STATE: Green btn-primary
+        btn.classList.add('devcontainer-launcher-btn--found', 'btn-primary');
         btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${iconStyle}">
             <path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z"/>
           </svg>
           ${isCompact ? '<span class="devcontainer-launcher-btn__text">Open Workspace</span>' : 'Open Workspace'}
@@ -314,9 +411,10 @@
         break;
         
       case 'missing':
+        // Standard gray button for create
         btn.classList.add('devcontainer-launcher-btn--missing');
         btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${iconStyle}">
             <path d="M7.75 2a.75.75 0 0 1 .75.75V7h4.25a.75.75 0 0 1 0 1.5H8.5v4.25a.75.75 0 0 1-1.5 0V8.5H2.75a.75.75 0 0 1 0-1.5H7V2.75A.75.75 0 0 1 7.75 2Z"/>
           </svg>
           ${isCompact ? '<span class="devcontainer-launcher-btn__text">Create Workspace</span>' : 'Create Workspace'}
@@ -325,20 +423,22 @@
         break;
         
       case 'error':
+        // Standard gray button with git-fork icon
         btn.classList.add('devcontainer-launcher-btn--error');
         btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true">
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${iconStyle}">
             <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
           </svg>
-          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Launch</span>' : 'Launch Devcontainer'}
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Devcontainer</span>' : 'Launch Devcontainer'}
         `;
         btn.title = data.error ? `Error: ${data.error}. Click to launch anyway.` : 'Launch devcontainer';
         break;
         
       case 'default':
       default:
+        // Standard gray button
         btn.innerHTML = `
-          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${isCompact ? '' : 'margin-right: 4px; vertical-align: text-bottom;'}">
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${iconStyle}">
             <path d="M1.5 3.25a2.25 2.25 0 1 1 3 2.122v5.256a2.251 2.251 0 1 1-1.5 0V5.372A2.25 2.25 0 0 1 1.5 3.25Zm5.677-.177L9.573.677A.25.25 0 0 1 10 .854V2.5h1A2.5 2.5 0 0 1 13.5 5v5.628a2.251 2.251 0 1 1-1.5 0V5a1 1 0 0 0-1-1h-1v1.646a.25.25 0 0 1-.427.177L7.177 3.427a.25.25 0 0 1 0-.354ZM3.75 2.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm8.25.75a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Z"/>
           </svg>
           ${isCompact ? '<span class="devcontainer-launcher-btn__text">Devcontainer</span>' : 'Launch Devcontainer'}
@@ -351,6 +451,7 @@
   /**
    * Find insertion point for Code tab (main repo view)
    * Targets the area near the green "Code" button
+   * Enhanced with broader selectors and fallbacks
    */
   function findCodeTabInsertionPoint() {
     // Primary: Look for the "Code" dropdown button area
@@ -376,20 +477,47 @@
       }
     }
 
-    // Fallback: file-navigation bar, but only if we're on a Code-like page
+    // Secondary: Look for file-navigation with broader selectors
     const fileNav = document.querySelector('.file-navigation');
     if (fileNav) {
-      // Verify this looks like a code tab (has branch selector or Code button)
-      const hasBranchSelector = fileNav.querySelector('[data-hotkey="w"], .branch-select-menu, #branch-select-menu');
-      const hasCodeButton = fileNav.querySelector('get-repo, [data-testid="code-button"], .get-repo-select-menu');
+      // Look for any action-like container on the right side
+      const actionSelectors = [
+        '.flex-self-end',
+        '.d-flex.gap-2',
+        '.BtnGroup',
+        '.file-navigation-options',
+        '.flex-justify-end',
+        '.d-md-flex',
+      ];
       
-      if (hasBranchSelector || hasCodeButton) {
-        // Find the right-side actions area
-        const actionsArea = fileNav.querySelector('.flex-self-end, .d-flex.gap-2, .BtnGroup');
+      for (const selector of actionSelectors) {
+        const actionsArea = fileNav.querySelector(selector);
         if (actionsArea) {
           return { element: actionsArea, position: 'inside' };
         }
-        return { element: fileNav, position: 'append' };
+      }
+      
+      // Last resort: append to file-navigation itself
+      return { element: fileNav, position: 'append' };
+    }
+
+    // Tertiary: Look for file-header (used in some GHE versions)
+    const fileHeader = document.querySelector('.file-header, .Box-header');
+    if (fileHeader) {
+      const actionsArea = fileHeader.querySelector('.BtnGroup, .d-flex, .flex-self-end');
+      if (actionsArea) {
+        return { element: actionsArea, position: 'inside' };
+      }
+      return { element: fileHeader, position: 'append' };
+    }
+
+    // Fallback: Look for repository-content area
+    const repoContent = document.querySelector('.repository-content, #repo-content-pjax-container');
+    if (repoContent) {
+      // Find the first suitable container
+      const container = repoContent.querySelector('.d-flex, .Box-header, .file-navigation');
+      if (container) {
+        return { element: container, position: 'append' };
       }
     }
 
@@ -508,8 +636,12 @@
 
   /**
    * Inject the launcher button into the page
+   * With retry logic for async DOM changes
    */
-  function injectButton() {
+  function injectButton(retryCount = 0) {
+    const MAX_RETRIES = 5;
+    const RETRY_DELAY = 200;
+
     // Skip if already injected
     if (document.getElementById(BUTTON_ID)) {
       return;
@@ -552,10 +684,22 @@
     }
 
     if (!insertionInfo) {
+      // Retry if we haven't exceeded max retries (DOM might not be ready)
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(() => injectButton(retryCount + 1), RETRY_DELAY);
+      }
       return;
     }
 
     const { element, position, variant = 'default' } = insertionInfo;
+    
+    // Double-check the element is still in the DOM
+    if (!document.body.contains(element)) {
+      if (retryCount < MAX_RETRIES) {
+        setTimeout(() => injectButton(retryCount + 1), RETRY_DELAY);
+      }
+      return;
+    }
     
     const button = createLauncherButton(repoInfo, variant);
 
@@ -599,7 +743,7 @@
         if (!document.getElementById(BUTTON_ID)) {
           injectButton();
         }
-      }, 100);
+      }, 150);
     });
 
     observer.observe(document.body, {
@@ -609,7 +753,7 @@
   }
 
   // Initial injection (with small delay for SPA hydration)
-  setTimeout(injectButton, 100);
+  setTimeout(() => injectButton(), 100);
 
   // Watch for SPA navigation
   watchForChanges();
@@ -617,18 +761,18 @@
   // Handle back/forward navigation
   window.addEventListener('popstate', () => {
     removeButton();
-    setTimeout(injectButton, 100);
+    setTimeout(() => injectButton(), 100);
   });
 
   // Handle turbo/pjax navigation (GitHub uses turbo)
   document.addEventListener('turbo:load', () => {
     removeButton();
-    setTimeout(injectButton, 100);
+    setTimeout(() => injectButton(), 100);
   });
   
   document.addEventListener('pjax:end', () => {
     removeButton();
-    setTimeout(injectButton, 100);
+    setTimeout(() => injectButton(), 100);
   });
 
 })();
