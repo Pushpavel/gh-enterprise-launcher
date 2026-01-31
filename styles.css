@@ -1,4 +1,4 @@
-/* Styles for Devcontainer Launcher button - v2.0.3 */
+/* Styles for Devcontainer Launcher button - v2.0.0 */
 /* Layout fixes: inline-flex container to prevent full-width expansion */
 
 /* ============================================================================
@@ -136,6 +136,33 @@
   cursor: wait !important;
 }
 
+/* Stopped workspace - yellow/orange button */
+.devcontainer-launcher-btn--found-stopped {
+  color: #24292f !important;
+  background-color: #f8d847 !important;
+  border: 1px solid rgba(27, 31, 36, 0.15) !important;
+  box-shadow: 0 1px 0 rgba(27, 31, 36, 0.1) !important;
+}
+
+.devcontainer-launcher-btn--found-stopped:hover {
+  background-color: #e6c72f !important;
+}
+
+.devcontainer-launcher-btn--found-stopped:active {
+  background-color: #d4b82a !important;
+}
+
+/* Transitioning state - subtle blue */
+.devcontainer-launcher-btn--transitioning {
+  color: #ffffff !important;
+  background-color: #0969da !important;
+  border: 1px solid rgba(27, 31, 36, 0.15) !important;
+}
+
+.devcontainer-launcher-btn--transitioning:hover {
+  background-color: #0860c4 !important;
+}
+
 /* Spinner for loading state */
 .devcontainer-launcher-spinner {
   width: 14px !important;
@@ -148,7 +175,9 @@
 }
 
 @keyframes devcontainer-spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* ============================================================================
@@ -176,7 +205,7 @@
   .devcontainer-launcher-btn--compact .devcontainer-launcher-btn__text {
     display: none !important;
   }
-  
+
   .devcontainer-launcher-btn--compact {
     padding: 3px 8px !important;
   }
@@ -219,8 +248,8 @@
 }
 
 /* Inside flex containers - proper flex item behavior */
-.d-flex > .devcontainer-launcher-container,
-[class*="Box-sc-"] > .devcontainer-launcher-container {
+.d-flex>.devcontainer-launcher-container,
+[class*="Box-sc-"]>.devcontainer-launcher-container {
   flex-shrink: 0 !important;
 }
 
@@ -308,11 +337,37 @@ react-partial .devcontainer-launcher-container {
   background-color: #2ea043 !important;
 }
 
+/* Dark mode for stopped workspace button */
+[data-color-mode="dark"] .devcontainer-launcher-btn--found-stopped,
+[data-dark-theme="dark"] .devcontainer-launcher-btn--found-stopped {
+  color: #1c2128 !important;
+  background-color: #d29922 !important;
+  border-color: rgba(240, 246, 252, 0.1) !important;
+}
+
+[data-color-mode="dark"] .devcontainer-launcher-btn--found-stopped:hover,
+[data-dark-theme="dark"] .devcontainer-launcher-btn--found-stopped:hover {
+  background-color: #bb8009 !important;
+}
+
+/* Dark mode for transitioning state */
+[data-color-mode="dark"] .devcontainer-launcher-btn--transitioning,
+[data-dark-theme="dark"] .devcontainer-launcher-btn--transitioning {
+  color: #ffffff !important;
+  background-color: #1f6feb !important;
+  border-color: rgba(240, 246, 252, 0.1) !important;
+}
+
+[data-color-mode="dark"] .devcontainer-launcher-btn--transitioning:hover,
+[data-dark-theme="dark"] .devcontainer-launcher-btn--transitioning:hover {
+  background-color: #388bfd !important;
+}
+
 /* ============================================================================
    SAFETY: Avoid state badge interference
    ============================================================================ */
 
-.State + .devcontainer-launcher-container,
-.IssueLabel + .devcontainer-launcher-container {
+.State+.devcontainer-launcher-container,
+.IssueLabel+.devcontainer-launcher-container {
   display: none !important;
 }

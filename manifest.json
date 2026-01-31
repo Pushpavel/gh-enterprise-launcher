@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "GitHub Enterprise Devcontainer Launcher",
-  "version": "2.0.6",
+  "version": "2.0.0",
   "description": "Smart workspace manager for GitHub Enterprise - detects existing Coder workspaces or creates new ones",
   "permissions": [
     "storage"
@@ -14,9 +14,15 @@
   },
   "content_scripts": [
     {
-      "matches": ["<all_urls>"],
-      "js": ["content.js"],
-      "css": ["styles.css"],
+      "matches": [
+        "<all_urls>"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "styles.css"
+      ],
       "run_at": "document_idle"
     }
   ],

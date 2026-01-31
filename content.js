@@ -1,12 +1,12 @@
 // Content script for GitHub Enterprise Devcontainer Launcher
-// v2.0.6 - Hotfix: Move button to right of Code button
+// v2.0.0 - Smart workspace status with start/stop capabilities
 
-(async function() {
+(async function () {
   'use strict';
 
   // Load settings from storage
   const settings = await chrome.storage.sync.get(['gheUrl', 'launcherUrl', 'coderUrl', 'coderApiToken']);
-  
+
   // Exit if not configured
   if (!settings.gheUrl) {
     return;
@@ -24,7 +24,7 @@
   // ============================================================================
   // BUTTON CONTRIBUTION STRATEGIES (Gitpod-style)
   // ============================================================================
-  
+
   /**
    * Button contribution strategies - modeled after Gitpod's button-contributions.ts
    * Each strategy targets a specific page type with robust selectors.
@@ -64,7 +64,7 @@
         },
       ],
     },
-    
+
     // ---------------------------------------------------------------------
     // gh-repo-legacy: Legacy file-navigation UI (older GHE versions)
     // ---------------------------------------------------------------------
@@ -165,44 +165,38 @@
 
     // ---------------------------------------------------------------------
     // gh-commit: Commit detail page
-    // Targets the area near "Browse files" button for consistent placement
-    // Uses XPath to find the parent of "Browse files" link as most robust option
+    // Matches Gitpod's approach: float:right positioning near "Browse files"
     // ---------------------------------------------------------------------
     {
       id: 'gh-commit',
       match: /\/commit\//,
-      // Primary: XPath to find parent of "Browse files" link (most robust)
-      selector: `xpath://a[contains(., 'Browse files')]/..`,
+      // Primary: Gitpod's selector for the full-commit container
+      selector: '#repo-content-pjax-container > div > div.commit.full-commit.mt-0.px-2.pt-2',
       fallbackSelectors: [
-        // Alternative XPath: parent of Browse files with data-testid
+        // Turbo frame variant
+        '#repo-content-turbo-frame > div > div.commit.full-commit.mt-0.px-2.pt-2',
+        // XPath to find parent of "Browse files" link
         `xpath://a[@data-testid='browse-at-time-link']/..`,
+        `xpath://a[contains(., 'Browse files')]/..`,
         // The commit-meta bar (contains Browse files, parent commits, etc.)
         '.commit-meta',
         '.full-commit .commit-meta',
         '.commit.full-commit .commit-meta',
-        // File navigation if present
-        '.file-navigation',
         // Container with Browse files link (CSS :has)
         '.full-commit div:has(> a[href*="/tree/"])',
         'div:has(> #browse-at-time-link)',
-        // React-based commit view
-        '[id^="repo-content-"] .commit-tease',
-        '[id^="repo-content-"] div:has(> a[data-testid="browse-at-time-link"])',
-        // Gitpod's selector for the full-commit container
-        '#repo-content-pjax-container > div > div.commit.full-commit.mt-0.px-2.pt-2',
         // Broader fallback: the commit header area
         '#repo-content-pjax-container .full-commit',
         '#repo-content-turbo-frame .full-commit',
       ],
-      // Try to insert before the "Browse files" link
-      insertBefore: '#browse-at-time-link, a[href*="/tree/"][data-testid], a.btn[href*="/tree/"], a:has-text("Browse files")',
+      // Insert before the "Browse files" link for proper positioning
+      insertBefore: '#browse-at-time-link',
       containerProps: {
         display: 'inline-flex',
-        float: 'none',
-        marginLeft: '0',
-        marginRight: '8px',
+        float: 'right',
+        marginLeft: '8px',
       },
-      position: 'prepend',
+      position: 'append',
       variant: 'default',
       additionalClassNames: ['medium'],
     },
@@ -213,8 +207,8 @@
     {
       id: 'gh-empty-repo',
       match: () => {
-        return document.querySelector('.blankslate') !== null || 
-               document.querySelector('[data-testid="empty-repo"]') !== null;
+        return document.querySelector('.blankslate') !== null ||
+          document.querySelector('[data-testid="empty-repo"]') !== null;
       },
       selector: '#repo-content-pjax-container > div > div.d-md-flex.flex-items-stretch.gutter-md.mb-4 > div.col-md-6.mb-4.mb-md-0 > div, #repo-content-turbo-frame > div > div.d-md-flex.flex-items-stretch.gutter-md.mb-4 > div.col-md-6.mb-4.mb-md-0 > div',
       containerProps: {
@@ -253,11 +247,11 @@
    */
   function findElement(selector) {
     if (!selector) return null;
-    
+
     if (selector.startsWith('xpath:')) {
       return evaluateXPath(selector.substring(6));
     }
-    
+
     try {
       return document.querySelector(selector);
     } catch (e) {
@@ -270,14 +264,14 @@
    */
   function findFirstMatch(selectors) {
     if (!selectors) return null;
-    
+
     const selectorList = Array.isArray(selectors) ? selectors : [selectors];
-    
+
     for (const selector of selectorList) {
       const el = findElement(selector);
       if (el) return el;
     }
-    
+
     return null;
   }
 
@@ -286,17 +280,17 @@
    */
   function matchesPage(contribution) {
     const { match } = contribution;
-    
+
     if (!match) return true;
-    
+
     if (typeof match === 'function') {
       return match();
     }
-    
+
     if (match instanceof RegExp) {
       return match.test(window.location.href);
     }
-    
+
     return true;
   }
 
@@ -305,23 +299,23 @@
    */
   function applyManipulations(manipulations) {
     if (!manipulations) return;
-    
+
     for (const manip of manipulations) {
       const el = findElement(manip.selector || manip.element);
       if (!el) continue;
-      
+
       if (manip.removeClassName) {
         el.classList.remove(manip.removeClassName);
       }
-      
+
       if (manip.addClassName) {
         el.classList.add(manip.addClassName);
       }
-      
+
       if (manip.style) {
         Object.assign(el.style, manip.style);
       }
-      
+
       if (manip.setAttribute) {
         for (const attr of manip.setAttribute) {
           el.setAttribute(attr.name, attr.value);
@@ -342,23 +336,23 @@
       if (typeof b.match === 'function' && typeof a.match !== 'function') return 1;
       return 0;
     });
-    
+
     for (const contribution of sorted) {
       if (!matchesPage(contribution)) continue;
-      
+
       // Try main selector
       let element = findElement(contribution.selector);
-      
+
       // Try fallback selectors
       if (!element && contribution.fallbackSelectors) {
         element = findFirstMatch(contribution.fallbackSelectors);
       }
-      
+
       if (element) {
         return { contribution, element };
       }
     }
-    
+
     return null;
   }
 
@@ -368,14 +362,14 @@
 
   function getRepoInfo() {
     const pathParts = location.pathname.split('/').filter(Boolean);
-    
+
     if (pathParts.length < 2) {
       return null;
     }
 
     const owner = pathParts[0];
     const repo = pathParts[1];
-    
+
     // Skip non-repo pages
     const nonRepoPages = ['settings', 'organizations', 'users', 'search', 'notifications', 'login', 'logout', 'explore', 'marketplace', 'sponsors'];
     if (nonRepoPages.includes(owner)) {
@@ -397,13 +391,13 @@
         return commitMatch[1]; // Return full commit SHA
       }
     }
-    
+
     // Special handling for PR pages - extract the "from" branch
     if (/\/pull\//.test(location.pathname)) {
       const prBranch = getPRHeadBranch();
       if (prBranch) return prBranch;
     }
-    
+
     // Try various selectors used in different GHE versions
     const selectors = [
       '[data-hotkey="w"] span.Text-sc-17v1xeu-0',
@@ -444,7 +438,7 @@
       '.gh-header-meta .commit-ref.head-ref a',
       '.gh-header-meta .commit-ref.head-ref',
     ];
-    
+
     for (const selector of headRefSelectors) {
       const el = document.querySelector(selector);
       if (el) {
@@ -454,7 +448,7 @@
         }
       }
     }
-    
+
     const commitRefs = document.querySelectorAll('.gh-header-meta .commit-ref');
     if (commitRefs.length >= 2) {
       const headRef = commitRefs[1];
@@ -463,7 +457,7 @@
         return text.includes(':') ? text.split(':').pop() : text;
       }
     }
-    
+
     return null;
   }
 
@@ -477,7 +471,7 @@
     const sanitizedBranch = branch.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     const sanitizedRepo = repo.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
     const workspaceName = `${sanitizedRepo}-${sanitizedBranch}`.toLowerCase().substring(0, 32);
-    
+
     return settings.launcherUrl
       .replace(/\{ssh_url\}/g, encodeURIComponent(sshUrl))
       .replace(/\{branch\}/g, encodeURIComponent(branch))
@@ -497,6 +491,28 @@
     });
   }
 
+  async function startWorkspace(workspaceId) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: 'START_WORKSPACE', workspaceId },
+        (response) => {
+          resolve(response || { success: false, error: 'No response' });
+        }
+      );
+    });
+  }
+
+  async function stopWorkspace(workspaceId) {
+    return new Promise((resolve) => {
+      chrome.runtime.sendMessage(
+        { action: 'STOP_WORKSPACE', workspaceId },
+        (response) => {
+          resolve(response || { success: false, error: 'No response' });
+        }
+      );
+    });
+  }
+
   // ============================================================================
   // BUTTON CREATION
   // ============================================================================
@@ -507,24 +523,24 @@
   function createContainer(containerProps, additionalClassNames = []) {
     const container = document.createElement('div');
     container.id = BUTTON_ID + '-container';
-    
+
     // Apply Gitpod-style inline layout classes
     container.classList.add(
       'devcontainer-launcher-container',
       'd-inline-flex',
       'flex-items-center'
     );
-    
+
     // Add any additional classes
     if (additionalClassNames.length > 0) {
       container.classList.add(...additionalClassNames.map(c => `devcontainer-launcher--${c}`));
     }
-    
+
     // Apply inline styles from containerProps
     if (containerProps) {
       Object.assign(container.style, containerProps);
     }
-    
+
     return container;
   }
 
@@ -534,27 +550,66 @@
     btn.id = BUTTON_ID;
     btn.href = '#';
     btn.setAttribute('role', 'button');
-    
+
     if (variant === 'compact') {
       btn.className = 'btn btn-sm devcontainer-launcher-btn devcontainer-launcher-btn--compact devcontainer-launcher-btn--loading';
     } else {
       btn.className = 'btn devcontainer-launcher-btn devcontainer-launcher-btn--loading';
     }
-    
+
     setButtonState(btn, 'loading', variant);
-    
+
     const branch = getCurrentBranch();
-    
+
     if (hasCoderApi) {
       checkWorkspaceStatus(repo, branch).then((result) => {
         btn.classList.remove('devcontainer-launcher-btn--loading');
-        
+
         if (result.status === 'found') {
-          setButtonState(btn, 'found', variant, result);
-          btn.onclick = (e) => {
-            e.preventDefault();
-            window.open(result.workspaceUrl, '_blank');
-          };
+          // Use workspaceState for smarter button display
+          const state = result.workspaceState || 'unknown';
+
+          if (state === 'running') {
+            // Workspace is running - show "Open Workspace" (primary/green)
+            setButtonState(btn, 'found-running', variant, result);
+            btn.onclick = (e) => {
+              e.preventDefault();
+              window.open(result.workspaceUrl, '_blank');
+            };
+          } else if (state === 'stopped' || state === 'failed' || state === 'canceled') {
+            // Workspace is stopped - show "Start Workspace" (warning/yellow)
+            setButtonState(btn, 'found-stopped', variant, result);
+            btn.onclick = async (e) => {
+              e.preventDefault();
+              // Start the workspace via API
+              setButtonState(btn, 'starting', variant, result);
+              const startResult = await startWorkspace(result.workspaceId);
+              if (startResult.success) {
+                // Open the workspace page to see the build progress
+                window.open(result.workspaceUrl, '_blank');
+              } else {
+                setButtonState(btn, 'error', variant, { error: startResult.error });
+                // Still allow opening the workspace page
+                setTimeout(() => {
+                  setButtonState(btn, 'found-stopped', variant, result);
+                }, 3000);
+              }
+            };
+          } else if (state === 'starting' || state === 'stopping') {
+            // Workspace is transitioning - show spinner
+            setButtonState(btn, 'transitioning', variant, result);
+            btn.onclick = (e) => {
+              e.preventDefault();
+              window.open(result.workspaceUrl, '_blank');
+            };
+          } else {
+            // Unknown state - default to open
+            setButtonState(btn, 'found', variant, result);
+            btn.onclick = (e) => {
+              e.preventDefault();
+              window.open(result.workspaceUrl, '_blank');
+            };
+          }
         } else if (result.status === 'missing') {
           setButtonState(btn, 'missing', variant, result);
           btn.onclick = (e) => {
@@ -595,7 +650,7 @@
         window.open(launcherUrl, '_blank');
       };
     }
-    
+
     return btn;
   }
 
@@ -603,15 +658,18 @@
     btn.classList.remove(
       'devcontainer-launcher-btn--loading',
       'devcontainer-launcher-btn--found',
+      'devcontainer-launcher-btn--found-running',
+      'devcontainer-launcher-btn--found-stopped',
       'devcontainer-launcher-btn--missing',
       'devcontainer-launcher-btn--error',
+      'devcontainer-launcher-btn--transitioning',
       'btn-primary'
     );
-    
+
     const isCompact = variant === 'compact';
     const iconSize = 16;
     const iconStyle = 'vertical-align: text-bottom; flex-shrink: 0;';
-    
+
     switch (state) {
       case 'loading':
         btn.classList.add('devcontainer-launcher-btn--loading');
@@ -621,18 +679,42 @@
         `;
         btn.title = 'Checking for existing workspace...';
         break;
-        
+
       case 'found':
-        btn.classList.add('devcontainer-launcher-btn--found', 'btn-primary');
+      case 'found-running':
+        btn.classList.add('devcontainer-launcher-btn--found', 'devcontainer-launcher-btn--found-running', 'btn-primary');
         btn.innerHTML = `
           <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${iconStyle}">
             <path d="M8.22 2.97a.75.75 0 0 1 1.06 0l4.25 4.25a.75.75 0 0 1 0 1.06l-4.25 4.25a.751.751 0 0 1-1.042-.018.751.751 0 0 1-.018-1.042l2.97-2.97H3.75a.75.75 0 0 1 0-1.5h7.44L8.22 4.03a.75.75 0 0 1 0-1.06Z"/>
           </svg>
           ${isCompact ? '<span class="devcontainer-launcher-btn__text">Open Workspace</span>' : 'Open Workspace'}
         `;
-        btn.title = data.workspaceName ? `Open workspace: ${data.workspaceName}` : 'Open existing workspace';
+        btn.title = data.workspaceName ? `Open running workspace: ${data.workspaceName}` : 'Open running workspace';
         break;
-        
+
+      case 'found-stopped':
+        btn.classList.add('devcontainer-launcher-btn--found', 'devcontainer-launcher-btn--found-stopped');
+        // Play/Start icon
+        btn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" width="${iconSize}" height="${iconSize}" viewBox="0 0 16 16" fill="currentColor" class="octicon" aria-hidden="true" style="${iconStyle}">
+            <path d="M8 0a8 8 0 1 1 0 16A8 8 0 0 1 8 0ZM1.5 8a6.5 6.5 0 1 0 13 0 6.5 6.5 0 0 0-13 0Zm4.879-2.773 4.264 2.559a.25.25 0 0 1 0 .428l-4.264 2.559A.25.25 0 0 1 6 10.559V5.442a.25.25 0 0 1 .379-.215Z"/>
+          </svg>
+          ${isCompact ? '<span class="devcontainer-launcher-btn__text">Start Workspace</span>' : 'Start Workspace'}
+        `;
+        btn.title = data.workspaceName ? `Start stopped workspace: ${data.workspaceName}` : 'Start stopped workspace';
+        break;
+
+      case 'transitioning':
+      case 'starting':
+        btn.classList.add('devcontainer-launcher-btn--loading', 'devcontainer-launcher-btn--transitioning');
+        const transitionText = state === 'starting' ? 'Starting...' : (data.workspaceState === 'stopping' ? 'Stopping...' : 'Working...');
+        btn.innerHTML = `
+          <span class="devcontainer-launcher-spinner"></span>
+          ${isCompact ? `<span class="devcontainer-launcher-btn__text">${transitionText}</span>` : transitionText}
+        `;
+        btn.title = data.workspaceName ? `${transitionText} ${data.workspaceName}` : transitionText;
+        break;
+
       case 'missing':
         btn.classList.add('devcontainer-launcher-btn--missing');
         btn.innerHTML = `
@@ -643,7 +725,7 @@
         `;
         btn.title = data.workspaceName ? `Create workspace: ${data.workspaceName}` : 'Create new workspace';
         break;
-        
+
       case 'error':
         btn.classList.add('devcontainer-launcher-btn--error');
         btn.innerHTML = `
@@ -654,7 +736,7 @@
         `;
         btn.title = data.error ? `Error: ${data.error}. Click to launch anyway.` : 'Launch devcontainer';
         break;
-        
+
       case 'default':
       default:
         btn.innerHTML = `
@@ -692,7 +774,7 @@
 
     // Find matching contribution
     const match = findMatchingContribution();
-    
+
     if (!match) {
       if (retryCount < MAX_RETRIES) {
         setTimeout(() => injectButton(retryCount + 1), RETRY_DELAY);
@@ -701,7 +783,7 @@
     }
 
     const { contribution, element } = match;
-    
+
     // Double-check the element is still in the DOM
     if (!document.body.contains(element)) {
       if (retryCount < MAX_RETRIES) {
@@ -718,14 +800,14 @@
       contribution.containerProps,
       contribution.additionalClassNames || []
     );
-    
+
     // Create and add button to container
     const button = createLauncherButton(repoInfo, contribution.variant || 'default');
     container.appendChild(button);
 
     // Insert based on position strategy
     const { position, insertBefore } = contribution;
-    
+
     if (position === 'inside-before' && insertBefore) {
       // Insert before a specific child element
       const beforeEl = findFirstMatch(insertBefore.split(', '));
@@ -760,7 +842,7 @@
   function watchForChanges() {
     let debounceTimer;
     let lastUrl = location.href;
-    
+
     const observer = new MutationObserver((mutations) => {
       clearTimeout(debounceTimer);
       debounceTimer = setTimeout(() => {
@@ -769,7 +851,7 @@
           lastUrl = currentUrl;
           removeButton();
         }
-        
+
         if (!document.getElementById(BUTTON_ID)) {
           injectButton();
         }
@@ -799,12 +881,12 @@
     removeButton();
     setTimeout(() => injectButton(), 100);
   });
-  
+
   document.addEventListener('turbo:frame-load', () => {
     removeButton();
     setTimeout(() => injectButton(), 100);
   });
-  
+
   document.addEventListener('pjax:end', () => {
     removeButton();
     setTimeout(() => injectButton(), 100);
