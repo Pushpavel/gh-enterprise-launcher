@@ -1,5 +1,5 @@
 // Content script for GitHub Enterprise Devcontainer Launcher
-// v2.0.5 - Hotfix: commit hash as branch, robust injection, name placeholder
+// v2.0.6 - Hotfix: Move button to right of Code button
 
 (async function() {
   'use strict';
@@ -41,19 +41,19 @@
         // New React UI: file-navigation is absent
         return document.querySelector('div.file-navigation') === null && regex.test(window.location.href);
       },
-      // Gitpod's exact XPath for new React UI
-      selector: `xpath://*[contains(@id, 'repo-content-')]/div/div/div/div[1]/react-partial/div/div/div[2]/div[2]`,
+      // Target the Code button directly to place our button after it
+      selector: `xpath://button[contains(., 'Code')]`,
       fallbackSelectors: [
-        // Fallback CSS selectors for the same area
-        '[id^="repo-content-"] react-partial [class*="Box-sc-"] > div:last-child',
-        '[id^="repo-content-"] .react-directory-commit-age + div',
+        '[data-testid="code-button"]',
+        'react-partial button[data-variant="primary"]',
+        'summary.btn-primary',
       ],
       containerProps: {
         display: 'inline-flex',
-        marginRight: '8px',
+        marginLeft: '8px',
         verticalAlign: 'middle',
       },
-      position: 'prepend',
+      position: 'after',
       variant: 'default',
       additionalClassNames: ['medium'],
       manipulations: [
@@ -73,16 +73,14 @@
       match: () => {
         return document.querySelector('div.file-navigation') !== null;
       },
-      selector: '.file-navigation',
+      // Target the Code button directly
+      selector: 'get-repo, details.get-repo-select-menu, [data-testid="code-button"], summary.btn-primary',
       containerProps: {
         display: 'inline-flex',
         marginLeft: '8px',
         verticalAlign: 'middle',
-        float: 'left',
       },
-      // Insert after the "Go to file" button (Gitpod-style)
-      insertBefore: 'get-repo, details.get-repo-select-menu, [data-testid="code-button"], summary.btn-primary',
-      position: 'inside-before',
+      position: 'after',
       variant: 'default',
     },
 
